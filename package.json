@@ -1,0 +1,17 @@
+{
+  "name": "mingkypiggy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MingkyPiggy — income/expense tracker for freelance/contractor jobs",
+  "type": "commonjs",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  }
+}
