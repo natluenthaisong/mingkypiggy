@@ -904,6 +904,11 @@ $('pinBtn').onclick = function() {
   }
 };
 $('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinBtn').click(); });
+$('pinInput').addEventListener('input', () => {
+  const val = $('pinInput').value;
+  const stored = getPin();
+  if (stored && val.length >= stored.length) $('pinBtn').click();
+});
 
 function lockApp() {
   if (!getPin()) return;
