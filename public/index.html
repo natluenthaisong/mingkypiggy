@@ -304,6 +304,28 @@
     cursor: pointer; font-family: inherit;
   }
   .gate .pin-card button:active { opacity: .9; }
+
+  /* ---- print / PDF export ---- */
+  .print-only { display: none; }
+  @media print {
+    header, .tabs, .fab, .sheet-bg, .card .actions,
+    .export-all, .rc-export, #menuBtn,
+    .month-bar > select, .month-bar > button,
+    .gate { display: none !important; }
+    body { background: #fff !important; padding: 0; font-size: 13px; }
+    .wrap { max-width: 100%; padding: 0 14px; }
+    .summary { margin-bottom: 10px; }
+    .stat { box-shadow: none !important; border: 1px solid #ddd; }
+    .stat.net { background: #1e293b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .card { box-shadow: none !important; page-break-inside: avoid; }
+    .report-card { box-shadow: none !important; border: 1px solid #ddd; page-break-inside: avoid; }
+    .print-only { display: block !important; }
+    .print-header { margin-bottom: 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .print-header h2 { font-size: 20px; margin: 0 0 3px; color: #1e293b; }
+    .print-header p { font-size: 12px; color: #64748b; margin: 0; }
+    .bar-track { border: 1px solid #ddd; }
+    .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
@@ -333,6 +355,12 @@
 </header>
 
 <div class="wrap">
+  <!-- print-only header, hidden on screen -->
+  <div class="print-header print-only" id="printHeader">
+    <h2>MingkyPiggy — รายรับรายจ่าย</h2>
+    <p id="printSubtitle"></p>
+  </div>
+
   <div class="tabs">
     <button id="tabList" class="active" data-ic="list" onclick="setView('list')">รายการ</button>
     <button id="tabReport" data-ic="chart" onclick="setView('report')">รายงานรายเดือน</button>
@@ -429,6 +457,10 @@
     <div class="grab"></div>
     <h2>ข้อมูล &amp; สำรอง</h2>
     <div class="menu-list">
+      <button class="menu-item" onclick="closeMenu(); exportPDF();">
+        <span class="mi-ic" data-ic="file"></span>
+        <span class="mi-tx"><span class="mi-tt">พิมพ์ / Export PDF</span><span class="mi-ds">บันทึกเป็น PDF หรือพิมพ์รายการปัจจุบัน</span></span>
+      </button>
       <button class="menu-item" onclick="closeMenu(); exportJSON();">
         <span class="mi-ic" data-ic="save"></span>
         <span class="mi-tx"><span class="mi-tt">สำรองข้อมูล</span><span class="mi-ds">บันทึกทุกงานเป็นไฟล์ .json ไว้กันหาย</span></span>
@@ -441,8 +473,44 @@
         <span class="mi-ic" data-ic="table"></span>
         <span class="mi-tx"><span class="mi-tt">ส่งออกทั้งหมด (CSV)</span><span class="mi-ds">เปิดใน Excel / Google Sheets ได้</span></span>
       </button>
+      <button class="menu-item" onclick="closeMenu(); openPinSheet();">
+        <span class="mi-ic" data-ic="lock"></span>
+        <span class="mi-tx"><span class="mi-tt">ตั้งค่า PIN</span><span class="mi-ds">ตั้ง เปลี่ยน หรือลบรหัสป้องกันแอป</span></span>
+      </button>
+      <button class="menu-item" id="lockBtn" onclick="closeMenu(); lockApp();" style="display:none;">
+        <span class="mi-ic" data-ic="lock"></span>
+        <span class="mi-tx"><span class="mi-tt">ล็อกแอป</span><span class="mi-ds">กลับไปหน้าใส่รหัส PIN</span></span>
+      </button>
     </div>
     <div class="btn-row"><button class="btn ghost" onclick="closeMenu()">ปิด</button></div>
+  </div>
+</div>
+
+<!-- Change PIN sheet -->
+<div class="sheet-bg" id="pinSheetBg">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="pinSheetTitle">ตั้งค่า PIN</h2>
+    <div id="pinCurrentField" class="field" style="display:none;">
+      <label for="pinCurrent">PIN ปัจจุบัน</label>
+      <input type="password" inputmode="numeric" id="pinCurrent" maxlength="8" placeholder="••••">
+    </div>
+    <div class="field">
+      <label for="pinNew">PIN ใหม่ (4–8 หลัก)</label>
+      <input type="password" inputmode="numeric" id="pinNew" maxlength="8" placeholder="••••">
+    </div>
+    <div class="field">
+      <label for="pinConfirm">ยืนยัน PIN ใหม่</label>
+      <input type="password" inputmode="numeric" id="pinConfirm" maxlength="8" placeholder="••••">
+    </div>
+    <p id="pinSheetErr" style="color:var(--red);font-size:13px;font-weight:600;min-height:18px;margin:0 0 12px;"></p>
+    <div class="btn-row">
+      <button class="btn ghost" id="pinSheetCancel">ยกเลิก</button>
+      <button class="btn primary" id="pinSheetSave">บันทึก PIN</button>
+    </div>
+    <div id="pinRemoveWrap" style="margin-top:12px;display:none;">
+      <button class="btn" style="width:100%;background:#fef2f2;color:var(--red);border:1px solid #fecaca;" id="pinRemoveBtn">ลบ PIN (ไม่ใช้รหัส)</button>
+    </div>
   </div>
 </div>
 
@@ -472,7 +540,8 @@ const ICONS = {
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
   pencil: '<path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
   trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
-  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
 };
 function ic(name, cls) { return `<svg class="ic${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`; }
 
@@ -797,6 +866,102 @@ function importJSON() {
   inp.click();
 }
 
+// ---- PIN gate ----
+const PIN_KEY = 'mingky_pin';
+function getPin() { return localStorage.getItem(PIN_KEY); }
+
+function initPinGate() {
+  if (getPin()) {
+    $('gate').classList.add('open');
+    setTimeout(() => $('pinInput').focus(), 100);
+  } else {
+    $('gate').classList.remove('open');
+    initApp();
+  }
+}
+
+let appReady = false;
+function initApp() {
+  if (appReady) return;
+  appReady = true;
+  load();
+  render();
+}
+
+$('pinBtn').onclick = function() {
+  const val = $('pinInput').value;
+  if (val === getPin()) {
+    $('gate').classList.remove('open');
+    $('pinErr').textContent = '';
+    $('pinInput').value = '';
+    $('lockBtn').style.display = '';
+    initApp();
+  } else {
+    $('pinErr').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
+    haptic(40);
+    $('pinInput').value = '';
+    $('pinInput').focus();
+  }
+};
+$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinBtn').click(); });
+
+function lockApp() {
+  if (!getPin()) return;
+  $('gate').classList.add('open');
+  $('pinInput').value = '';
+  $('pinErr').textContent = '';
+  setTimeout(() => $('pinInput').focus(), 100);
+}
+
+// ---- change / set PIN sheet ----
+function openPinSheet() {
+  const hasPin = !!getPin();
+  $('pinSheetTitle').textContent = hasPin ? 'เปลี่ยน PIN' : 'ตั้งค่า PIN';
+  $('pinCurrentField').style.display = hasPin ? '' : 'none';
+  $('pinRemoveWrap').style.display = hasPin ? '' : 'none';
+  $('pinCurrent').value = ''; $('pinNew').value = ''; $('pinConfirm').value = '';
+  $('pinSheetErr').textContent = '';
+  $('pinSheetBg').classList.add('open');
+}
+function closePinSheet() { $('pinSheetBg').classList.remove('open'); }
+
+$('pinSheetCancel').onclick = closePinSheet;
+$('pinSheetBg').onclick = e => { if (e.target === $('pinSheetBg')) closePinSheet(); };
+
+$('pinSheetSave').onclick = function() {
+  const hasPin = !!getPin();
+  const cur = $('pinCurrent').value;
+  const nw = $('pinNew').value;
+  const cf = $('pinConfirm').value;
+  $('pinSheetErr').textContent = '';
+  if (hasPin && cur !== getPin()) { $('pinSheetErr').textContent = 'PIN ปัจจุบันไม่ถูกต้อง'; return; }
+  if (!/^\d{4,8}$/.test(nw)) { $('pinSheetErr').textContent = 'PIN ต้องเป็นตัวเลข 4–8 หลัก'; return; }
+  if (nw !== cf) { $('pinSheetErr').textContent = 'PIN ทั้งสองต้องตรงกัน'; return; }
+  localStorage.setItem(PIN_KEY, nw);
+  $('lockBtn').style.display = '';
+  closePinSheet();
+  alert('ตั้งค่า PIN เรียบร้อยแล้ว');
+};
+
+$('pinRemoveBtn').onclick = function() {
+  if ($('pinCurrent').value !== getPin()) { $('pinSheetErr').textContent = 'PIN ปัจจุบันไม่ถูกต้อง'; return; }
+  if (confirm('ยืนยันการลบ PIN? แอปจะไม่มีรหัสป้องกัน')) {
+    localStorage.removeItem(PIN_KEY);
+    $('lockBtn').style.display = 'none';
+    closePinSheet();
+    alert('ลบ PIN เรียบร้อยแล้ว');
+  }
+};
+
+// ---- PDF export ----
+function exportPDF() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const view = currentView === 'report' ? 'รายงานรายเดือน' : (currentMonth === 'all' ? 'ทุกเดือน' : monthLabel(currentMonth));
+  $('printSubtitle').textContent = view + ' · พิมพ์เมื่อ ' + dateStr;
+  window.print();
+}
+
 // events
 $('addBtn').onclick = () => openSheet(null);
 $('cancelBtn').onclick = closeSheet;
@@ -807,12 +972,10 @@ $('f_income').oninput = updateNetPreview;
 $('f_expense').oninput = updateNetPreview;
 $('menuBtn').onclick = openMenu;
 $('menuBg').onclick = e => { if (e.target === $('menuBg')) closeMenu(); };
-// close any open sheet with the phone/browser back gesture
-window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeMenu(); } });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeMenu(); closePinSheet(); } });
 
 initStaticIcons();
-load();
-render();
+initPinGate();
 </script>
 </body>
 </html>
