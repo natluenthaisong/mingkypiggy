@@ -304,6 +304,11 @@
     cursor: pointer; font-family: inherit;
   }
   .gate .pin-card button:active { opacity: .9; }
+  .gate .version { font-size: 11px; opacity: .55; margin: -20px 0 26px; }
+
+  .sheet-err { color: var(--red); font-size: 13px; font-weight: 600; min-height: 18px; margin: 0 0 12px; }
+  .btn.danger { width: 100%; background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  .mt-12 { margin-top: 12px; }
 
   /* ---- print / PDF export ---- */
   .print-only { display: none; }
@@ -334,7 +339,7 @@
   <div class="piggy-badge" data-ic="piggy"></div>
   <h1>MingkyPiggy</h1>
   <p>ใส่รหัสเพื่อเข้าใช้งาน</p>
-  <p style="font-size:11px;opacity:.55;margin:-20px 0 26px;">v1.1.0</p>
+  <p class="version" id="gateVersion"></p>
   <div class="pin-card">
     <label for="pinInput">รหัส PIN</label>
     <input type="password" inputmode="numeric" id="pinInput" autocomplete="current-password" placeholder="••••">
@@ -504,19 +509,21 @@
       <label for="pinConfirm">ยืนยัน PIN ใหม่</label>
       <input type="password" inputmode="numeric" id="pinConfirm" maxlength="8" placeholder="••••">
     </div>
-    <p id="pinSheetErr" style="color:var(--red);font-size:13px;font-weight:600;min-height:18px;margin:0 0 12px;"></p>
+    <p id="pinSheetErr" class="sheet-err"></p>
     <div class="btn-row">
       <button class="btn ghost" id="pinSheetCancel">ยกเลิก</button>
       <button class="btn primary" id="pinSheetSave">บันทึก PIN</button>
     </div>
-    <div id="pinRemoveWrap" style="margin-top:12px;display:none;">
-      <button class="btn" style="width:100%;background:#fef2f2;color:var(--red);border:1px solid #fecaca;" id="pinRemoveBtn">ลบ PIN (ไม่ใช้รหัส)</button>
+    <div id="pinRemoveWrap" class="mt-12" style="display:none;">
+      <button class="btn danger" id="pinRemoveBtn">ลบ PIN (ไม่ใช้รหัส)</button>
     </div>
   </div>
 </div>
 
 <script>
+const APP_VERSION = '1.1.0';
 const STORE = 'income_tracker_v1';
+const THAI_MONTHS = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 let data = [];
 
 const $ = id => document.getElementById(id);
@@ -567,14 +574,12 @@ function monthKeyOf(rec) {
 function monthLabel(key) {
   if (key === 'no-date') return 'ไม่ระบุวันที่';
   const [y,m] = key.split('-');
-  const months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  return months[parseInt(m)] + ' ' + (parseInt(y)+543);
+  return THAI_MONTHS[parseInt(m)] + ' ' + (parseInt(y)+543);
 }
 function thDate(d) {
   if (!d) return '–';
   const [y,m,day] = d.split('-');
-  const months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  return parseInt(day) + ' ' + months[parseInt(m)] + ' ' + (parseInt(y)+543);
+  return parseInt(day) + ' ' + THAI_MONTHS[parseInt(m)] + ' ' + (parseInt(y)+543);
 }
 
 let currentMonth = 'all';
@@ -981,6 +986,7 @@ $('menuBg').onclick = e => { if (e.target === $('menuBg')) closeMenu(); };
 window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeMenu(); closePinSheet(); } });
 
 initStaticIcons();
+$('gateVersion').textContent = 'v' + APP_VERSION;
 initPinGate();
 </script>
 </body>
