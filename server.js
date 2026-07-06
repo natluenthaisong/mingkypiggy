@@ -26,7 +26,11 @@ db.exec(`
 
 const app = express();
 app.use(express.json({ limit: "4mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+  },
+}));
 
 // ── shared-PIN auth ────────────────────────────────────────────────
 function auth(req, res, next) {
