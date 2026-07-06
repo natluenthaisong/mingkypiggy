@@ -342,9 +342,8 @@
   <p class="version" id="gateVersion"></p>
   <div class="pin-card">
     <label for="pinInput">รหัส PIN</label>
-    <input type="password" inputmode="numeric" id="pinInput" autocomplete="current-password" placeholder="••••">
+    <input type="password" inputmode="numeric" id="pinInput" autocomplete="current-password" placeholder="••••" autofocus>
     <p class="err" id="pinErr"></p>
-    <button id="pinBtn">เข้าใช้งาน</button>
   </div>
 </div>
 
@@ -854,10 +853,11 @@ function initApp() {
   render();
 }
 
+let pinInFlight = false;
 async function tryLogin() {
   const pin = $('pinInput').value;
-  if (!pin) return;
-  $('pinBtn').disabled = true;
+  if (!pin || pinInFlight) return;
+  pinInFlight = true;
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
@@ -878,11 +878,20 @@ async function tryLogin() {
   } catch {
     $('pinErr').textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง';
   } finally {
-    $('pinBtn').disabled = false;
+    pinInFlight = false;
   }
 }
-$('pinBtn').onclick = tryLogin;
-$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+// auto-submit once at least 4 digits are entered (debounced so we don't
+// fire a request on every keystroke while the user keeps typing longer PINs)
+let pinDebounce;
+$('pinInput').addEventListener('input', () => {
+  $('pinErr').textContent = '';
+  clearTimeout(pinDebounce);
+  if ($('pinInput').value.length < 4) return;
+  pinDebounce = setTimeout(tryLogin, 300);
+});
+$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(pinDebounce); tryLogin(); } });
 
 function lockApp() {
   appReady = false;
