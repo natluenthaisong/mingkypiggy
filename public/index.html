@@ -157,7 +157,10 @@
   .bar-row { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 8px; font-size: 13px; }
   .bar-row .bl { color: var(--muted); font-weight: 600; }
   .bar-track { background: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; }
-  .bar-fill { display: block; height: 100%; border-radius: 6px; transition: width .3s; }
+  .bar-fill {
+    display: block; width: 100%; height: 100%; border-radius: 6px;
+    transform: scaleX(0); transform-origin: left; transition: transform .3s;
+  }
   .bar-fill.inc { background: var(--green); }
   .bar-fill.exp { background: var(--red); }
   .bar-row .bv { font-weight: 600; white-space: nowrap; }
@@ -684,12 +687,12 @@ function renderReport() {
         <div class="bar-group">
           <div class="bar-row">
             <span class="bl">รายรับ</span>
-            <span class="bar-track"><span class="bar-fill inc" style="width:${(g.inc/max*100).toFixed(1)}%"></span></span>
+            <span class="bar-track"><span class="bar-fill inc" style="transform:scaleX(${(g.inc/max).toFixed(3)})"></span></span>
             <span class="bv" style="color:var(--green)">${fmtBaht(g.inc)}</span>
           </div>
           <div class="bar-row">
             <span class="bl">รายจ่าย</span>
-            <span class="bar-track"><span class="bar-fill exp" style="width:${(g.exp/max*100).toFixed(1)}%"></span></span>
+            <span class="bar-track"><span class="bar-fill exp" style="transform:scaleX(${(g.exp/max).toFixed(3)})"></span></span>
             <span class="bv" style="color:var(--red)">${fmtBaht(g.exp)}</span>
           </div>
         </div>
