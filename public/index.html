@@ -479,44 +479,12 @@
         <span class="mi-ic" data-ic="table"></span>
         <span class="mi-tx"><span class="mi-tt">ส่งออกทั้งหมด (CSV)</span><span class="mi-ds">เปิดใน Excel / Google Sheets ได้</span></span>
       </button>
-      <button class="menu-item" onclick="closeMenu(); openPinSheet();">
-        <span class="mi-ic" data-ic="lock"></span>
-        <span class="mi-tx"><span class="mi-tt">ตั้งค่า PIN</span><span class="mi-ds">ตั้ง เปลี่ยน หรือลบรหัสป้องกันแอป</span></span>
-      </button>
-      <button class="menu-item" id="lockBtn" onclick="closeMenu(); lockApp();" style="display:none;">
+      <button class="menu-item" onclick="closeMenu(); lockApp();">
         <span class="mi-ic" data-ic="lock"></span>
         <span class="mi-tx"><span class="mi-tt">ล็อกแอป</span><span class="mi-ds">กลับไปหน้าใส่รหัส PIN</span></span>
       </button>
     </div>
     <div class="btn-row"><button class="btn ghost" onclick="closeMenu()">ปิด</button></div>
-  </div>
-</div>
-
-<!-- Change PIN sheet -->
-<div class="sheet-bg" id="pinSheetBg">
-  <div class="sheet">
-    <div class="grab"></div>
-    <h2 id="pinSheetTitle">ตั้งค่า PIN</h2>
-    <div id="pinCurrentField" class="field" style="display:none;">
-      <label for="pinCurrent">PIN ปัจจุบัน</label>
-      <input type="password" inputmode="numeric" id="pinCurrent" maxlength="8" placeholder="••••">
-    </div>
-    <div class="field">
-      <label for="pinNew">PIN ใหม่ (4–8 หลัก)</label>
-      <input type="password" inputmode="numeric" id="pinNew" maxlength="8" placeholder="••••">
-    </div>
-    <div class="field">
-      <label for="pinConfirm">ยืนยัน PIN ใหม่</label>
-      <input type="password" inputmode="numeric" id="pinConfirm" maxlength="8" placeholder="••••">
-    </div>
-    <p id="pinSheetErr" class="sheet-err"></p>
-    <div class="btn-row">
-      <button class="btn ghost" id="pinSheetCancel">ยกเลิก</button>
-      <button class="btn primary" id="pinSheetSave">บันทึก PIN</button>
-    </div>
-    <div id="pinRemoveWrap" class="mt-12" style="display:none;">
-      <button class="btn danger" id="pinRemoveBtn">ลบ PIN (ไม่ใช้รหัส)</button>
-    </div>
   </div>
 </div>
 
@@ -872,18 +840,10 @@ function importJSON() {
   inp.click();
 }
 
-// ---- PIN gate ----
-const PIN_KEY = 'mingky_pin';
-function getPin() { return localStorage.getItem(PIN_KEY); }
-
+// ---- PIN gate (verified against the shared server-side PIN on every load) ----
 function initPinGate() {
-  if (getPin()) {
-    $('gate').classList.add('open');
-    setTimeout(() => $('pinInput').focus(), 100);
-  } else {
-    $('gate').classList.remove('open');
-    initApp();
-  }
+  $('gate').classList.add('open');
+  setTimeout(() => $('pinInput').focus(), 100);
 }
 
 let appReady = false;
@@ -894,75 +854,43 @@ function initApp() {
   render();
 }
 
-$('pinBtn').onclick = function() {
-  const val = $('pinInput').value;
-  if (val === getPin()) {
-    $('gate').classList.remove('open');
-    $('pinErr').textContent = '';
-    $('pinInput').value = '';
-    $('lockBtn').style.display = '';
-    initApp();
-  } else {
-    $('pinErr').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
-    haptic(40);
-    $('pinInput').value = '';
-    $('pinInput').focus();
+async function tryLogin() {
+  const pin = $('pinInput').value;
+  if (!pin) return;
+  $('pinBtn').disabled = true;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (res.ok) {
+      $('gate').classList.remove('open');
+      $('pinErr').textContent = '';
+      $('pinInput').value = '';
+      initApp();
+    } else {
+      $('pinErr').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
+      haptic(40);
+      $('pinInput').value = '';
+      $('pinInput').focus();
+    }
+  } catch {
+    $('pinErr').textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง';
+  } finally {
+    $('pinBtn').disabled = false;
   }
-};
-$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinBtn').click(); });
-$('pinInput').addEventListener('input', () => {
-  const val = $('pinInput').value;
-  const stored = getPin();
-  if (stored && val.length >= stored.length) $('pinBtn').click();
-});
+}
+$('pinBtn').onclick = tryLogin;
+$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 
 function lockApp() {
-  if (!getPin()) return;
+  appReady = false;
   $('gate').classList.add('open');
   $('pinInput').value = '';
   $('pinErr').textContent = '';
   setTimeout(() => $('pinInput').focus(), 100);
 }
-
-// ---- change / set PIN sheet ----
-function openPinSheet() {
-  const hasPin = !!getPin();
-  $('pinSheetTitle').textContent = hasPin ? 'เปลี่ยน PIN' : 'ตั้งค่า PIN';
-  $('pinCurrentField').style.display = hasPin ? '' : 'none';
-  $('pinRemoveWrap').style.display = hasPin ? '' : 'none';
-  $('pinCurrent').value = ''; $('pinNew').value = ''; $('pinConfirm').value = '';
-  $('pinSheetErr').textContent = '';
-  $('pinSheetBg').classList.add('open');
-}
-function closePinSheet() { $('pinSheetBg').classList.remove('open'); }
-
-$('pinSheetCancel').onclick = closePinSheet;
-$('pinSheetBg').onclick = e => { if (e.target === $('pinSheetBg')) closePinSheet(); };
-
-$('pinSheetSave').onclick = function() {
-  const hasPin = !!getPin();
-  const cur = $('pinCurrent').value;
-  const nw = $('pinNew').value;
-  const cf = $('pinConfirm').value;
-  $('pinSheetErr').textContent = '';
-  if (hasPin && cur !== getPin()) { $('pinSheetErr').textContent = 'PIN ปัจจุบันไม่ถูกต้อง'; return; }
-  if (!/^\d{4,8}$/.test(nw)) { $('pinSheetErr').textContent = 'PIN ต้องเป็นตัวเลข 4–8 หลัก'; return; }
-  if (nw !== cf) { $('pinSheetErr').textContent = 'PIN ทั้งสองต้องตรงกัน'; return; }
-  localStorage.setItem(PIN_KEY, nw);
-  $('lockBtn').style.display = '';
-  closePinSheet();
-  alert('ตั้งค่า PIN เรียบร้อยแล้ว');
-};
-
-$('pinRemoveBtn').onclick = function() {
-  if ($('pinCurrent').value !== getPin()) { $('pinSheetErr').textContent = 'PIN ปัจจุบันไม่ถูกต้อง'; return; }
-  if (confirm('ยืนยันการลบ PIN? แอปจะไม่มีรหัสป้องกัน')) {
-    localStorage.removeItem(PIN_KEY);
-    $('lockBtn').style.display = 'none';
-    closePinSheet();
-    alert('ลบ PIN เรียบร้อยแล้ว');
-  }
-};
 
 // ---- PDF export ----
 function exportPDF() {
@@ -983,7 +911,7 @@ $('f_income').oninput = updateNetPreview;
 $('f_expense').oninput = updateNetPreview;
 $('menuBtn').onclick = openMenu;
 $('menuBg').onclick = e => { if (e.target === $('menuBg')) closeMenu(); };
-window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeMenu(); closePinSheet(); } });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); closeMenu(); } });
 
 initStaticIcons();
 $('gateVersion').textContent = 'v' + APP_VERSION;
