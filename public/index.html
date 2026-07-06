@@ -286,25 +286,30 @@
   .gate .piggy-badge .ic { width: 48px; height: 48px; }
   .gate h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
   .gate p { margin: 0 0 26px; font-size: 14px; opacity: .9; }
-  .gate .pin-card {
-    background: #fff; border-radius: 20px; padding: 22px; width: 100%; max-width: 340px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.25);
-  }
-  .gate .pin-card label { display: block; text-align: left; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
-  .gate .pin-card input {
-    width: 100%; font-size: 22px; letter-spacing: .3em; text-align: center; font-weight: 700;
-    padding: 14px; border: 2px solid var(--line); border-radius: 14px; color: var(--ink);
-    font-family: inherit; background: #fff;
-  }
-  .gate .pin-card input:focus { outline: none; border-color: var(--brand); }
-  .gate .pin-card .err { color: var(--red); font-size: 13px; font-weight: 600; margin: 10px 0 0; min-height: 18px; }
-  .gate .pin-card button {
-    width: 100%; margin-top: 14px; min-height: 52px; border: none; border-radius: 14px;
-    background: var(--grad-strong); color: #fff; font-size: 16px; font-weight: 800;
-    cursor: pointer; font-family: inherit;
-  }
-  .gate .pin-card button:active { opacity: .9; }
   .gate .version { font-size: 11px; opacity: .55; margin: -20px 0 26px; }
+
+  /* PIN dots display */
+  .pin-dots { display: flex; gap: 16px; justify-content: center; margin-bottom: 10px; min-height: 20px; }
+  .pin-dots .dot {
+    width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7);
+    background: transparent; transition: background .12s, transform .12s;
+  }
+  .pin-dots .dot.filled { background: #fff; transform: scale(1.05); }
+  .gate .err { color: #fecaca; font-size: 13px; font-weight: 700; margin: 4px 0 22px; min-height: 18px; }
+
+  /* Numeric keypad */
+  .keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 16px; justify-content: center; }
+  .keypad button {
+    width: 72px; height: 72px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.14); color: #fff; font-size: 26px; font-weight: 600;
+    cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+    transition: background .1s;
+  }
+  .keypad button:active { background: rgba(255,255,255,.3); }
+  .keypad button.empty { background: transparent; cursor: default; }
+  .keypad button.empty:active { background: transparent; }
+  .keypad button.back { font-size: 20px; }
+  .keypad button.back .ic { width: 26px; height: 26px; }
 
   .sheet-err { color: var(--red); font-size: 13px; font-weight: 600; min-height: 18px; margin: 0 0 12px; }
   .btn.danger { width: 100%; background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
@@ -340,10 +345,21 @@
   <h1>MingkyPiggy</h1>
   <p>ใส่รหัสเพื่อเข้าใช้งาน</p>
   <p class="version" id="gateVersion"></p>
-  <div class="pin-card">
-    <label for="pinInput">รหัส PIN</label>
-    <input type="password" inputmode="numeric" id="pinInput" autocomplete="current-password" placeholder="••••" autofocus>
-    <p class="err" id="pinErr"></p>
+  <div class="pin-dots" id="pinDots"></div>
+  <p class="err" id="pinErr"></p>
+  <div class="keypad" id="pinKeypad">
+    <button type="button" data-digit="1">1</button>
+    <button type="button" data-digit="2">2</button>
+    <button type="button" data-digit="3">3</button>
+    <button type="button" data-digit="4">4</button>
+    <button type="button" data-digit="5">5</button>
+    <button type="button" data-digit="6">6</button>
+    <button type="button" data-digit="7">7</button>
+    <button type="button" data-digit="8">8</button>
+    <button type="button" data-digit="9">9</button>
+    <button type="button" class="empty" tabindex="-1"></button>
+    <button type="button" data-digit="0">0</button>
+    <button type="button" class="back" id="pinBackspace" aria-label="ลบ">⌫</button>
   </div>
 </div>
 
@@ -839,10 +855,22 @@ function importJSON() {
   inp.click();
 }
 
-// ---- PIN gate (verified against the shared server-side PIN on every load) ----
+// ---- PIN gate: on-screen numeric keypad, verified against the shared
+// server-side PIN (APP_PIN) on every load ----
+const PIN_MAX_LEN = 8;
+let pinValue = '';
+
+function renderPinDots() {
+  const dots = $('pinDots');
+  dots.innerHTML = Array.from({ length: Math.max(pinValue.length, 4) })
+    .map((_, i) => `<span class="dot${i < pinValue.length ? ' filled' : ''}"></span>`)
+    .join('');
+}
+
 function initPinGate() {
+  pinValue = '';
+  renderPinDots();
   $('gate').classList.add('open');
-  setTimeout(() => $('pinInput').focus(), 100);
 }
 
 let appReady = false;
@@ -855,7 +883,7 @@ function initApp() {
 
 let pinInFlight = false;
 async function tryLogin() {
-  const pin = $('pinInput').value;
+  const pin = pinValue;
   if (!pin || pinInFlight) return;
   pinInFlight = true;
   try {
@@ -867,13 +895,14 @@ async function tryLogin() {
     if (res.ok) {
       $('gate').classList.remove('open');
       $('pinErr').textContent = '';
-      $('pinInput').value = '';
+      pinValue = '';
+      renderPinDots();
       initApp();
     } else {
       $('pinErr').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
       haptic(40);
-      $('pinInput').value = '';
-      $('pinInput').focus();
+      pinValue = '';
+      renderPinDots();
     }
   } catch {
     $('pinErr').textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง';
@@ -882,23 +911,41 @@ async function tryLogin() {
   }
 }
 
-// auto-submit once at least 4 digits are entered (debounced so we don't
-// fire a request on every keystroke while the user keeps typing longer PINs)
+// auto-submit once at least 4 digits are entered (debounced so the user can
+// keep tapping if their PIN is longer than 4 digits before we check it)
 let pinDebounce;
-$('pinInput').addEventListener('input', () => {
+function pressDigit(d) {
+  if (pinValue.length >= PIN_MAX_LEN) return;
   $('pinErr').textContent = '';
+  pinValue += d;
+  renderPinDots();
+  haptic(6);
   clearTimeout(pinDebounce);
-  if ($('pinInput').value.length < 4) return;
-  pinDebounce = setTimeout(tryLogin, 300);
+  if (pinValue.length >= 4) pinDebounce = setTimeout(tryLogin, 300);
+}
+function pressBackspace() {
+  clearTimeout(pinDebounce);
+  pinValue = pinValue.slice(0, -1);
+  $('pinErr').textContent = '';
+  renderPinDots();
+  haptic(6);
+}
+$('pinKeypad').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-digit]');
+  if (btn) pressDigit(btn.dataset.digit);
 });
-$('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(pinDebounce); tryLogin(); } });
+$('pinBackspace').onclick = pressBackspace;
+window.addEventListener('keydown', e => {
+  if (!$('gate').classList.contains('open')) return;
+  if (/^[0-9]$/.test(e.key)) pressDigit(e.key);
+  else if (e.key === 'Backspace') pressBackspace();
+  else if (e.key === 'Enter') { clearTimeout(pinDebounce); tryLogin(); }
+});
 
 function lockApp() {
   appReady = false;
-  $('gate').classList.add('open');
-  $('pinInput').value = '';
+  initPinGate();
   $('pinErr').textContent = '';
-  setTimeout(() => $('pinInput').focus(), 100);
 }
 
 // ---- PDF export ----
